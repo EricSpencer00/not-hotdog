@@ -12,3 +12,4 @@ uv.lock
 
 # Generated test vectors — 25 MB, reproducible from reference/gen_*.py
 engine/test/vectors/
+MODEL_CARD.md

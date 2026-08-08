@@ -67,7 +67,7 @@ deploy: build
 	@cd "$(SITE)" && git rev-parse --abbrev-ref HEAD | grep -qx dev || \
 		{ echo "refusing to deploy: $(SITE) is not on the dev branch"; exit 1; }
 	mkdir -p "$(SITE)/hotdog"
-	rsync -a --delete dist/ "$(SITE)/hotdog/"
+	rsync -a --delete --delete-excluded --exclude model.js dist/ "$(SITE)/hotdog/"
 	@echo "copied dist/ -> $(SITE)/hotdog/  (review on dev, then merge to main)"
 
 clean:
