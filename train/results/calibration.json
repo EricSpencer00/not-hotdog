@@ -1,0 +1,10 @@
+{
+  "threshold_int32": 55983,
+  "f1_at_threshold": 0.6722338204592903,
+  "precision_at_threshold": 0.7453703703703703,
+  "recall_at_threshold": 0.6121673003802282,
+  "f1_at_zero": 0.6348122866894198,
+  "precision_at_zero": 0.5758513931888545,
+  "recall_at_zero": 0.7072243346007605,
+  "n_val": 3369
+}

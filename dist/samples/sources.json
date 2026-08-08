@@ -1,0 +1,50 @@
+[
+  {
+    "file": "hotdog.webp",
+    "class": "hot_dog",
+    "source_id": "openimages:test:071139b01d296de0:0",
+    "url": "https://open-images-dataset.s3.amazonaws.com/test/071139b01d296de0.jpg",
+    "license": "CC BY 2.0 (Open Images V7; per-image attribution at https://storage.googleapis.com/openimages/web/download_v7.html)",
+    "bytes": 4352
+  },
+  {
+    "file": "corndog.webp",
+    "class": "corn_dog",
+    "source_id": "hard:002177f1325f96c3",
+    "url": "https://open-images-dataset.s3.amazonaws.com/train/002177f1325f96c3.jpg",
+    "license": "CC BY 2.0 (Open Images V7; per-image attribution at https://storage.googleapis.com/openimages/web/download_v7.html)",
+    "bytes": 4232
+  },
+  {
+    "file": "bratwurst.webp",
+    "class": "bratwurst",
+    "source_id": "hard:00dd63a6da037b22",
+    "url": "https://open-images-dataset.s3.amazonaws.com/train/00dd63a6da037b22.jpg",
+    "license": "CC BY 2.0 (Open Images V7; per-image attribution at https://storage.googleapis.com/openimages/web/download_v7.html)",
+    "bytes": 5268
+  },
+  {
+    "file": "sub.webp",
+    "class": "submarine_sandwich",
+    "source_id": "oi_labels:00fc59b3dde1d65b",
+    "url": "https://open-images-dataset.s3.amazonaws.com/train/00fc59b3dde1d65b.jpg",
+    "license": "CC BY 2.0 (Open Images V7; per-image attribution at https://storage.googleapis.com/openimages/web/download_v7.html)",
+    "bytes": 8068
+  },
+  {
+    "file": "burger.webp",
+    "class": "hamburger",
+    "source_id": "oi_labels:0011e5d4c30a5b42",
+    "url": "https://open-images-dataset.s3.amazonaws.com/train/0011e5d4c30a5b42.jpg",
+    "license": "CC BY 2.0 (Open Images V7; per-image attribution at https://storage.googleapis.com/openimages/web/download_v7.html)",
+    "bytes": 5876
+  },
+  {
+    "file": "dachshund.webp",
+    "class": "dachshund",
+    "source_id": "hard:00f8f05f47e76a56",
+    "url": "https://open-images-dataset.s3.amazonaws.com/train/00f8f05f47e76a56.jpg",
+    "license": "CC BY 2.0 (Open Images V7; per-image attribution at https://storage.googleapis.com/openimages/web/download_v7.html)",
+    "bytes": 12202
+  }
+]

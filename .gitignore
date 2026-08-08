@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+cache/
+data/images/
+train/checkpoints/
+*.pt
+*.pth
+.DS_Store
+node_modules/
+uv.lock
+
+# Generated test vectors — 25 MB, reproducible from reference/gen_*.py
+engine/test/vectors/

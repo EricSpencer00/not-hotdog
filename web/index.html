@@ -1,0 +1,166 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Not Hotdog — a 136K-parameter CNN in plain JavaScript</title>
+<meta name="description" content="Hot dog or not hot dog. An int8 convolutional network with hand-written JavaScript kernels, no dependencies, running entirely on your device.">
+<meta name="author" content="Eric Spencer">
+<link rel="canonical" href="https://ericspencer.us/hotdog/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Not Hotdog">
+<meta property="og:description" content="A 136,417-parameter int8 CNN with hand-written JavaScript kernels. No dependencies. Nothing leaves your device.">
+<meta property="og:url" content="https://ericspencer.us/hotdog/">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap">
+<style>
+:root{
+  --paper:oklch(0.978 0.006 80);--ink:oklch(0.11 0.015 60);--accent:oklch(0.30 0.13 22);
+  --dim:oklch(0.52 0.01 70);--rule:oklch(0.87 0.005 80);
+  --yes:oklch(0.62 0.16 145);--no:oklch(0.55 0.19 25);
+  --verdict:var(--rule);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+  font-size:16px;line-height:1.7;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.wrap{max-width:720px;margin:0 auto;padding:56px 24px 24px}
+.mono,code{font-family:"IBM Plex Mono",ui-monospace,monospace}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+hr{border:0;border-top:1px solid var(--rule);margin:28px 0}
+h1{font-size:clamp(30px,5vw,44px);font-weight:700;letter-spacing:-0.025em;line-height:1.05;margin:0 0 8px}
+nav.top{font-size:14px;font-weight:500;color:var(--dim);margin:14px 0 0}
+nav.top a{color:inherit}
+nav.top a:hover{color:var(--ink);text-decoration:none}
+.lead{font-size:17px;line-height:1.6;letter-spacing:-0.01em;color:var(--ink);margin:10px 0 0}
+h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--dim);margin:36px 0 12px}
+
+/* ── stage ─────────────────────────────────────────────────────────────── */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,220px);gap:24px;align-items:start}
+@media(max-width:620px){.stage{grid-template-columns:1fr}}
+.view{position:relative;aspect-ratio:1;background:oklch(0.94 0.005 80);
+  border:1px solid var(--rule);border-radius:6px;overflow:hidden;display:grid;place-items:center}
+.view video,.view canvas.preview{width:100%;height:100%;object-fit:cover;display:block}
+.view.drag{border-color:var(--accent);border-style:dashed}
+.placeholder{color:var(--dim);font-size:14px;text-align:center;padding:24px;line-height:1.5}
+
+/* ── receipts ──────────────────────────────────────────────────────────── */
+.receipts{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--dim);
+  font-variant-numeric:tabular-nums}
+.receipts .row{display:flex;justify-content:space-between;gap:10px;
+  padding:3px 0;border-bottom:1px dotted var(--rule)}
+.receipts .row:last-child{border-bottom:0}
+.receipts b{color:var(--ink);font-weight:500}
+.bar{height:4px;background:var(--rule);border-radius:2px;overflow:hidden;margin:8px 0 12px}
+.bar i{display:block;height:100%;width:0;background:var(--verdict);
+  transition:width .28s cubic-bezier(.2,.8,.2,1),background-color .28s}
+
+/* ── verdict ───────────────────────────────────────────────────────────── */
+.verdict{margin:28px 0 0;padding:clamp(28px,7vw,56px) 24px;border-radius:8px;
+  background:var(--verdict);color:var(--paper);text-align:center;
+  transition:background-color .34s cubic-bezier(.2,.8,.2,1);position:relative;overflow:hidden}
+.verdict .word{font-family:"IBM Plex Mono",monospace;font-weight:500;
+  font-size:clamp(30px,10vw,72px);letter-spacing:-0.04em;line-height:1;
+  display:block;transition:transform .34s cubic-bezier(.2,.9,.25,1.1),opacity .2s}
+.verdict.idle{color:var(--dim);background:oklch(0.94 0.005 80)}
+.verdict .sub{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;
+  opacity:.72;margin-top:10px;font-weight:500}
+.verdict.flip .word{transform:scale(1.06)}
+
+/* ── controls ──────────────────────────────────────────────────────────── */
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0}
+button{font-family:"Plus Jakarta Sans",sans-serif;font-size:13px;font-weight:600;
+  color:var(--ink);background:transparent;border:1px solid var(--rule);
+  border-radius:5px;padding:7px 13px;cursor:pointer;transition:border-color .15s,color .15s}
+button:hover{border-color:var(--ink)}
+button[aria-pressed=true]{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── samples ───────────────────────────────────────────────────────────── */
+.samples{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}
+.samples button{padding:0;border-radius:5px;overflow:hidden;width:60px;height:60px;
+  background:oklch(0.94 0.005 80);position:relative}
+.samples img{width:100%;height:100%;object-fit:cover;display:block}
+.samples .lbl{position:absolute;inset:auto 0 0 0;font-family:"IBM Plex Mono",monospace;
+  font-size:9px;background:oklch(0.11 0.015 60/.72);color:var(--paper);padding:1px 0}
+
+/* ── internals ─────────────────────────────────────────────────────────── */
+.internals{margin:8px 0 0}
+.layers{display:flex;gap:14px;overflow-x:auto;padding:4px 0 10px}
+.layer{flex:0 0 auto;text-align:center}
+.layer canvas{image-rendering:pixelated;border:1px solid var(--rule);
+  border-radius:3px;display:block;width:76px;height:76px;background:oklch(0.94 0.005 80)}
+.layer .nm{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--dim);margin-top:5px}
+.layer .sh{font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--dim);opacity:.7}
+.note{font-size:13px;color:var(--dim);margin:10px 0 0}
+footer{margin-top:44px;border-top:1px solid var(--rule);padding-top:14px;
+  font-size:13px;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.hide{display:none!important}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(prefers-reduced-motion:reduce){
+  *{transition-duration:0.01ms!important;animation-duration:0.01ms!important}
+}
+</style></head><body><div class="wrap">
+
+<h1>Not Hotdog</h1>
+<nav class="top"><a href="/">index</a> &nbsp;&middot;&nbsp; <a href="/projects.html">projects</a> &nbsp;&middot;&nbsp; <a href="https://github.com/EricSpencer00/not-hotdog">source</a></nav>
+<p class="lead">A convolutional network with <b>136,417 int8 parameters</b> and hand-written JavaScript kernels. No TensorFlow, no ONNX, no WebAssembly, no dependencies at all. Every pixel stays on your device.</p>
+
+<hr>
+
+<div class="stage">
+  <div>
+    <div class="view" id="view">
+      <video id="video" playsinline muted class="hide"></video>
+      <canvas id="preview" class="preview hide"></canvas>
+      <p class="placeholder" id="placeholder">Drop an image, paste one, pick a sample below,<br>or point your camera at lunch.</p>
+    </div>
+  </div>
+  <div class="receipts" id="receipts">
+    <div class="bar"><i id="bar"></i></div>
+    <div class="row"><span>confidence</span><b id="r-conf">—</b></div>
+    <div class="row"><span>logit (int32)</span><b id="r-logit">—</b></div>
+    <div class="row"><span>inference</span><b id="r-ms">—</b></div>
+    <div class="row"><span>parameters</span><b id="r-params">—</b></div>
+    <div class="row"><span>weights</span><b id="r-size">—</b></div>
+    <div class="row"><span>input</span><b>96&times;96 RGB</b></div>
+    <div class="row"><span>dependencies</span><b>0</b></div>
+    <div class="row"><span>uploads</span><b>0</b></div>
+  </div>
+</div>
+
+<div class="verdict idle" id="verdict" role="status" aria-live="polite">
+  <span class="word" id="verdict-word">READY</span>
+  <div class="sub" id="verdict-sub">waiting for an image</div>
+</div>
+
+<div class="controls">
+  <button id="btn-cam">Use camera</button>
+  <button id="btn-file">Choose image</button>
+  <button id="btn-internals" aria-pressed="false" aria-controls="internals">Show internals</button>
+  <input type="file" id="file" accept="image/*" class="vh" tabindex="-1">
+</div>
+
+<h2>Samples</h2>
+<div class="samples" id="samples"></div>
+
+<div class="internals hide" id="internals">
+  <h2>Inside the network</h2>
+  <div class="layers" id="layers"></div>
+  <p class="note">Each tile is up to 16 channels of one block's uint8 activations, brightest value normalised per channel. Left to right the maps get smaller and more abstract: the stem responds to edges and colour, the last blocks respond to whole objects.</p>
+</div>
+
+<h2>How it works</h2>
+<p>An EfficientNet-B0 was fine-tuned as a teacher, then distilled into the small network above, then quantized to 8-bit integers with quantization-aware training. The result runs through four convolution kernels written by hand in JavaScript: a dense 3&times;3, a depthwise 3&times;3, a pointwise 1&times;1, and a fixed-point requantizer.</p>
+<p>The forward pass uses no floating-point arithmetic. Weights are int8, activations are uint8, accumulators are int32, and rescaling between layers is done with an integer multiply and a shift. Getting the high 32 bits of a 64-bit product in a language whose only number is a double is <a href="https://github.com/EricSpencer00/not-hotdog#the-hard-part">the interesting part</a>.</p>
+<p>The JavaScript is checked against a NumPy implementation of the same integer program and must produce <b>identical</b> logits on every validation image — not close, identical.</p>
+
+<footer>
+  <span>Eric Spencer &middot; <a href="https://github.com/EricSpencer00/not-hotdog">source &amp; numbers</a></span>
+  <span>Inspired by the SeeFood gag in <i>Silicon Valley</i>. Not affiliated with HBO.</span>
+</footer>
+
+</div>
+<script src="./hotdog.js"></script>
+</body></html>

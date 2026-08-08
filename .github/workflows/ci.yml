@@ -1,0 +1,47 @@
+name: ci
+
+# Runs the correctness proof, not the training. The exported int8 model is
+# committed (136 KB), so CI needs no dataset and no torch — just numpy to
+# regenerate the reference vectors, and node to check the engine against them.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install numpy
+        run: pip install --quiet numpy
+
+      - name: Generate fixed-point vectors
+        run: python reference/gen_fixedpoint_vectors.py
+
+      - name: Generate kernel vectors
+        run: python reference/gen_kernel_vectors.py
+
+      - name: Generate parity vectors
+        # Synthetic inputs: no dataset required, and they push accumulators
+        # closer to saturation than natural images do.
+        run: python reference/gen_parity_vectors.py --source random --n 300
+
+      - name: Run engine tests
+        run: node --test engine/test/*.test.js
+
+      - name: Check bundle builds and stays within budget
+        run: |
+          python build.py
+          test -f dist/hotdog.js

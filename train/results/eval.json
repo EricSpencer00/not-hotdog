@@ -1,0 +1,86 @@
+{
+  "model": "int8",
+  "params": 136416,
+  "val": {
+    "n": 3369,
+    "positives": 263,
+    "accuracy": 0.9533986346096764,
+    "majority_baseline": 0.9219352923716236,
+    "balanced_accuracy": 0.7972298188958449,
+    "precision": 0.7453703703703703,
+    "recall": 0.6121673003802282,
+    "specificity": 0.9822923374114617,
+    "f1": 0.6722338204592903,
+    "tp": 161,
+    "fp": 55,
+    "tn": 3051,
+    "fn": 102
+  },
+  "test": {
+    "n": 3415,
+    "positives": 253,
+    "accuracy": 0.9478770131771596,
+    "majority_baseline": 0.9259150805270864,
+    "balanced_accuracy": 0.7918557324753184,
+    "precision": 0.6609442060085837,
+    "recall": 0.6086956521739131,
+    "specificity": 0.9750158127767236,
+    "f1": 0.6337448559670783,
+    "tp": 154,
+    "fp": 79,
+    "tn": 3083,
+    "fn": 99
+  },
+  "hard": {
+    "n": 150,
+    "positives": 14,
+    "accuracy": 0.8133333333333334,
+    "majority_baseline": 0.9066666666666666,
+    "balanced_accuracy": 0.5446428571428571,
+    "precision": 0.15,
+    "recall": 0.21428571428571427,
+    "specificity": 0.875,
+    "f1": 0.1764705882352941,
+    "tp": 3,
+    "fp": 17,
+    "tn": 119,
+    "fn": 11,
+    "per_class": {
+      "bratwurst": {
+        "correct": 34,
+        "n": 40,
+        "accuracy": 0.85
+      },
+      "chili_dog": {
+        "correct": 3,
+        "n": 12,
+        "accuracy": 0.25
+      },
+      "corn_dog": {
+        "correct": 8,
+        "n": 10,
+        "accuracy": 0.8
+      },
+      "dachshund": {
+        "correct": 40,
+        "n": 40,
+        "accuracy": 1.0
+      },
+      "hot_dog_bun": {
+        "correct": 31,
+        "n": 40,
+        "accuracy": 0.775
+      },
+      "hot_dog_wild": {
+        "correct": 0,
+        "n": 2,
+        "accuracy": 0.0
+      },
+      "sausage_roll": {
+        "correct": 6,
+        "n": 6,
+        "accuracy": 1.0
+      }
+    }
+  }
+}
