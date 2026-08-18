@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Not Hotdog"
+abstract: "An int8 convolutional neural network implemented in hand-written JavaScript, running inference in the browser."
+type: software
+authors:
+  - family-names: Spencer
+    given-names: Eric
+    affiliation: "Loyola University Chicago"
+    website: "https://ericspencer.us"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # add once the iD is registered
+repository-code: "https://github.com/EricSpencer00/not-hotdog"
+url: "https://ericspencer.us"
+license: MIT
+version: "1.0.0"
+date-released: "2026-08-18"
