@@ -15,7 +15,7 @@ help:
 	@echo "test-fast  same, but parity on 300 synthetic images (what CI runs)"
 	@echo "eval       accuracy of the int8 model on val, test and the hard set"
 	@echo "numbers    rewrite the figures in README.md and the write-up"
-	@echo "deploy     rsync dist/ into \$$SITE/hotdog/ (default $(SITE))"
+	@echo "deploy     test-fast, then rsync dist/ into \$$SITE/hotdog/ (default $(SITE))"
 
 setup:
 	uv venv --python 3.11 && uv sync
@@ -68,7 +68,8 @@ eval:
 numbers: build
 	$(PY) scripts/fill_numbers.py
 
-deploy: build
+# test-fast first: a broken engine must not reach the site repo.
+deploy: test-fast build
 	@test -d "$(SITE)" || { echo "site repo not found at $(SITE)"; exit 1; }
 	@cd "$(SITE)" && git rev-parse --abbrev-ref HEAD | grep -qx dev || \
 		{ echo "refusing to deploy: $(SITE) is not on the dev branch"; exit 1; }
