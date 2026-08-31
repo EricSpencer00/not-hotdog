@@ -21,7 +21,7 @@ preprocessing. Not the float checkpoint.
 |---|---|
 | parameters | 136,417 (int8) |
 | weights | 133 KB |
-| page weight | 239 KB raw, ~155 KB gzipped |
+| page weight | 239 KB raw, ~156 KB gzipped |
 | dependencies | 0 |
 | inference | ~26 ms (Node, M1 Max) |
 | MACs | 14.0M |
@@ -207,7 +207,7 @@ bytes off the canvas, and preprocessing is a byte copy.
 
 1. **Teacher.** EfficientNet-B0, ImageNet-pretrained, fine-tuned at 224px.
 2. **Distillation.** 30 epochs against the teacher's soft targets at `T=4`,
-   `α=0.7`. For a student 200× smaller this is most of the point: the hard label
+   `α=0.7`. For a student 39× smaller this is most of the point: the hard label
    says "hot dog", the soft target says "0.83 hot dog", and the gap encodes what
    the teacher knows about *how* hot-dog-like a particular image is.
 3. **Calibration.** Activation ranges observed with the weights frozen. Doing

@@ -1,7 +1,7 @@
 PY := .venv/bin/python
 SITE ?= ../EricSpencer00.github.io
 
-.PHONY: help setup data teacher student export calibrate build test test-fast eval samples deploy clean
+.PHONY: help setup data teacher student export calibrate build test test-fast eval samples numbers deploy clean
 
 help:
 	@echo "setup      create the venv and install dependencies"
@@ -10,10 +10,11 @@ help:
 	@echo "student    distil + QAT the 136K model"
 	@echo "export     emit int8 weights for both engines"
 	@echo "calibrate  pick the decision threshold on val, fold it into the bias"
-	@echo "build      bundle dist/ (index.html + hotdog.js)"
+	@echo "build      bundle dist/ (index.html + hotdog.js + how-it-works.html)"
 	@echo "test       kernel + fixed-point + full parity on the val set"
 	@echo "test-fast  same, but parity on 300 synthetic images (what CI runs)"
 	@echo "eval       accuracy of the int8 model on val, test and the hard set"
+	@echo "numbers    rewrite the figures in README.md and the write-up"
 	@echo "deploy     rsync dist/ into \$$SITE/hotdog/ (default $(SITE))"
 
 setup:
@@ -62,6 +63,11 @@ test-fast:
 eval:
 	$(PY) train/eval.py
 
+# Every published figure comes from train/results/. Run this after a retrain,
+# and after any edit that changes the bundle size.
+numbers: build
+	$(PY) scripts/fill_numbers.py
+
 deploy: build
 	@test -d "$(SITE)" || { echo "site repo not found at $(SITE)"; exit 1; }
 	@cd "$(SITE)" && git rev-parse --abbrev-ref HEAD | grep -qx dev || \
@@ -71,4 +77,4 @@ deploy: build
 	@echo "copied dist/ -> $(SITE)/hotdog/  (review on dev, then merge to main)"
 
 clean:
-	rm -rf dist/hotdog.js dist/index.html dist/samples engine/test/vectors
+	rm -rf dist/hotdog.js dist/index.html dist/how-it-works.html dist/samples engine/test/vectors

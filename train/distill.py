@@ -13,7 +13,7 @@ observed ranges honest — if the weights were still moving, the EMA would be
 tracking a distribution that no longer exists by the time training ends.
 
 The distillation loss is binary cross-entropy against the teacher's *soft*
-probability at temperature T, not against the hard label. For a 200x smaller
+probability at temperature T, not against the hard label. For a 39x smaller
 student that difference is most of the point: the hard label says "hot dog",
 the soft target says "0.83 hot dog", and the gap encodes what the teacher
 knows about how hot-dog-like this particular image is.

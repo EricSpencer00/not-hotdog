@@ -24,11 +24,10 @@ Inspired by the SeeFood gag in HBO's *Silicon Valley*. Not affiliated with HBO.
 | 8 | Design | Editorial chrome + full-bleed verdict + live activation visualization |
 | 9 | Structure | Separate repo; `make deploy` rsyncs `dist/` → site repo `hotdog/` on `dev` |
 | 10 | Verification | Kernel unit tests + bit-exact parity + adversarial eval set + CI |
-| 11 | Artifacts | README/model card, HF publish, homepage listing. Blog post deferred. |
+| 11 | Artifacts | README/model card, HF publish, homepage listing, write-up at `/hotdog/how-it-works.html`. |
 
 **Explicitly out of scope:** URL-paste input (CORS breaks it), synthetic training data,
-the "SeeFood" name, a blog post (write it once real numbers exist), any server-side
-component, any analytics, any telemetry.
+the "SeeFood" name, any server-side component, any analytics, any telemetry.
 
 ---
 
