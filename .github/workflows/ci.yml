@@ -45,3 +45,10 @@ jobs:
         run: |
           python build.py
           test -f dist/hotdog.js
+
+      - name: Check README and write-up match train/results/
+        # Every published figure comes from fill_numbers.py. A hand-edited or
+        # stale number must fail here, not ship.
+        run: |
+          python scripts/fill_numbers.py
+          git diff --exit-code README.md web/how-it-works.html
