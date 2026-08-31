@@ -8,6 +8,7 @@ page, so it gets the same treatment as the README.
 
 from __future__ import annotations
 
+import gzip
 import json
 import sys
 from pathlib import Path
@@ -25,6 +26,11 @@ WRITEUP_END = "<!--/RESULTS-->"
 
 def pct(x: float) -> str:
     return f"{x * 100:.1f}%"
+
+
+def gzipped(path: Path) -> int:
+    """What the browser actually downloads. Measured, not a ratio guess."""
+    return len(gzip.compress(path.read_bytes(), 9))
 
 
 def fill(path: Path, start: str, end: str, body: str) -> None:
@@ -121,6 +127,7 @@ def main() -> None:
 
     html = (DIST / "index.html").stat().st_size
     js = (DIST / "hotdog.js").stat().st_size
+    gz = sum(gzipped(DIST / f) for f in ("index.html", "hotdog.js"))
 
     t, v, h = ev["test"], ev["val"], ev.get("hard", {})
 
@@ -139,7 +146,7 @@ preprocessing. Not the float checkpoint.
 |---|---|
 | parameters | {ev['params'] + 1:,} (int8) |
 | weights | {ev['params'] / 1024:.0f} KB |
-| page weight | {(html + js) / 1024:.0f} KB raw, ~{(html + js) * 0.65 / 1024:.0f} KB gzipped |
+| page weight | {(html + js) / 1024:.0f} KB raw, {gz / 1024:.0f} KB gzipped |
 | dependencies | 0 |
 | inference | ~26 ms (Node, M1 Max) |
 | MACs | 14.0M |

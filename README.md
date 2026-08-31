@@ -21,7 +21,7 @@ preprocessing. Not the float checkpoint.
 |---|---|
 | parameters | 136,417 (int8) |
 | weights | 133 KB |
-| page weight | 239 KB raw, ~156 KB gzipped |
+| page weight | 239 KB raw, 161 KB gzipped |
 | dependencies | 0 |
 | inference | ~26 ms (Node, M1 Max) |
 | MACs | 14.0M |
