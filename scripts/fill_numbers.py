@@ -1,8 +1,9 @@
-"""Write the measured numbers into README.md.
+"""Write the measured numbers into README.md and web/how-it-works.html.
 
 Numbers live in train/results/*.json and are injected between markers rather
 than typed. Anything typed by hand drifts the moment the model is retrained,
-and a stale accuracy claim in a README is worse than no claim.
+and a stale accuracy claim is worse than no claim. The write-up is a published
+page, so it gets the same treatment as the README.
 """
 
 from __future__ import annotations
@@ -18,9 +19,98 @@ from common import DIST, RESULTS, ROOT
 START = "<!--NUMBERS-->"
 END = "<!--/NUMBERS-->"
 
+WRITEUP_START = "<!--RESULTS-->"
+WRITEUP_END = "<!--/RESULTS-->"
+
 
 def pct(x: float) -> str:
     return f"{x * 100:.1f}%"
+
+
+def fill(path: Path, start: str, end: str, body: str) -> None:
+    """Replace everything between the two markers. Both must already exist."""
+    s = path.read_text()
+    if start not in s or end not in s:
+        sys.exit(f"no {start} block in {path}")
+    pre = s.split(start)[0]
+    post = s.split(end)[1]
+    path.write_text(pre + start + body + end + post)
+    print(f"filled numbers into {path}")
+
+
+def writeup_body(ev: dict, student: dict, teacher: dict, cal: dict) -> str:
+    """The same numbers again, as the HTML tables in web/how-it-works.html."""
+    t, v, h = ev["test"], ev["val"], ev.get("hard", {})
+
+    def row(name: str, d: dict) -> str:
+        return (
+            f"<tr><td>{name}</td><td class=\"n\">{d['n']:,}</td>"
+            f"<td class=\"n\">{d['positives']}</td>"
+            f"<td class=\"n\">{pct(d['accuracy'])}</td>"
+            f"<td class=\"n\">{pct(d['majority_baseline'])}</td>"
+            f"<td class=\"n\">{d['f1']:.3f}</td>"
+            f"<td class=\"n\">{d['precision']:.3f}</td>"
+            f"<td class=\"n\">{d['recall']:.3f}</td></tr>"
+        )
+
+    splits = "\n".join([row("validation", v), row("test", t), row("adversarial", h)])
+    per_class = "\n".join(
+        f"<tr><td><code>{k}</code></td><td class=\"n\">{c['n']}</td>"
+        f"<td class=\"n\">{c['correct']}/{c['n']}</td>"
+        f"<td class=\"n\">{pct(c['accuracy'])}</td></tr>"
+        for k, c in h.get("per_class", {}).items()
+    )
+
+    return f"""
+<h3>Accuracy</h3>
+
+<table>
+<thead><tr><th>split</th><th class="n">n</th><th class="n">positives</th><th class="n">accuracy</th><th class="n">majority</th><th class="n">F1</th><th class="n">precision</th><th class="n">recall</th></tr></thead>
+<tbody>
+{splits}
+</tbody>
+</table>
+
+<p><b>Read F1, not accuracy.</b> About {pct(1 - t['positives'] / t['n'])} of the test split is negative, so a
+model that says "not a hot dog" to everything already scores {pct(t['majority_baseline'])}. The accuracy
+column is there because people expect it, not because it means much.</p>
+
+<h3>The adversarial set</h3>
+
+<p>Six classes are held out entirely. Not one image of any of them appears in
+training.</p>
+
+<table>
+<thead><tr><th>class</th><th class="n">n</th><th class="n">correct</th><th class="n">accuracy</th></tr></thead>
+<tbody>
+{per_class}
+</tbody>
+</table>
+
+<p>Adversarial accuracy, {pct(h.get('accuracy', 0))}, is below the majority baseline of {pct(h.get('majority_baseline', 0))}. That is
+not a rounding artefact. On this set the model is worse than a rock with "not a
+hot dog" written on it.</p>
+
+<p>The per-class split says why, and it is more interesting than the aggregate.
+The model rejects things that are nearly hot dogs: it gets {h.get('tn', 0)}/{h.get('tn', 0) + h.get('fp', 0)} of the
+held-out negatives, never once mistakes a dachshund for food, and correctly
+refuses {h['per_class']['corn_dog']['correct']} of {h['per_class']['corn_dog']['n']} corn dogs. What it fails is hard positives, {h.get('tp', 0)}/{h.get('tp', 0) + h.get('fn', 0)}, driven by chili
+dogs — hot dogs buried under chili, which look nothing like the canonical
+article.</p>
+
+<h3>The pipeline, end to end</h3>
+
+<table>
+<thead><tr><th>stage</th><th>metric</th></tr></thead>
+<tbody>
+<tr><td>teacher (EfficientNet-B0, 5.3M params)</td><td>F1 {teacher['f1']:.3f}, accuracy {pct(teacher['accuracy'])}</td></tr>
+<tr><td>student after distillation (float)</td><td>F1 {student['float_val_f1']:.3f}</td></tr>
+<tr><td>student after QAT (int8)</td><td>F1 {student['qat_val_f1']:.3f}</td></tr>
+<tr><td>cost of quantization</td><td>{student['float_val_f1'] - student['qat_val_f1']:+.3f} F1</td></tr>
+<tr><td>decision threshold (int32, folded into bias)</td><td>{cal['threshold_int32']:,}</td></tr>
+</tbody>
+</table>
+"""
 
 
 def main() -> None:
@@ -124,19 +214,9 @@ is the part QAT was for.
 | per-kernel vs NumPy | 29 cases, 0 mismatches |
 | JS engine vs Python integer reference | {cal['n_val']:,} validation images, **0 mismatches** |
 """
-    readme = ROOT / "README.md"
-    s = readme.read_text()
-    if START in s and END in s:
-        pre = s.split(START)[0]
-        post = s.split(END)[1]
-        s = pre + START + body + END + post
-    elif START in s:
-        pre, post = s.split(START, 1)
-        s = pre + START + body + END + post
-    else:
-        sys.exit("no <!--NUMBERS--> marker in README.md")
-    readme.write_text(s)
-    print(f"filled numbers into {readme}")
+    fill(ROOT / "README.md", START, END, body)
+    fill(ROOT / "web" / "how-it-works.html", WRITEUP_START, WRITEUP_END,
+         writeup_body(ev, student, teacher, cal))
 
 
 if __name__ == "__main__":

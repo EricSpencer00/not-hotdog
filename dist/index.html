@@ -104,7 +104,7 @@ footer{margin-top:44px;border-top:1px solid var(--rule);padding-top:14px;
 </style></head><body><div class="wrap">
 
 <h1>Not Hotdog</h1>
-<nav class="top"><a href="/">index</a> &nbsp;&middot;&nbsp; <a href="/projects.html">projects</a> &nbsp;&middot;&nbsp; <a href="https://github.com/EricSpencer00/not-hotdog">source</a></nav>
+<nav class="top"><a href="/">index</a> &nbsp;&middot;&nbsp; <a href="/projects.html">projects</a> &nbsp;&middot;&nbsp; <a href="./how-it-works.html">how it works</a> &nbsp;&middot;&nbsp; <a href="https://github.com/EricSpencer00/not-hotdog">source</a></nav>
 <p class="lead">A convolutional network with <b>136,417 int8 parameters</b> and hand-written JavaScript kernels. No TensorFlow, no ONNX, no WebAssembly, no dependencies at all. Every pixel stays on your device.</p>
 
 <hr>
@@ -153,11 +153,12 @@ footer{margin-top:44px;border-top:1px solid var(--rule);padding-top:14px;
 
 <h2>How it works</h2>
 <p>An EfficientNet-B0 was fine-tuned as a teacher, then distilled into the small network above, then quantized to 8-bit integers with quantization-aware training. The result runs through four convolution kernels written by hand in JavaScript: a dense 3&times;3, a depthwise 3&times;3, a pointwise 1&times;1, and a fixed-point requantizer.</p>
-<p>The forward pass uses no floating-point arithmetic. Weights are int8, activations are uint8, accumulators are int32, and rescaling between layers is done with an integer multiply and a shift. Getting the high 32 bits of a 64-bit product in a language whose only number is a double is <a href="https://github.com/EricSpencer00/not-hotdog#the-hard-part">the interesting part</a>.</p>
+<p>The forward pass uses no floating-point arithmetic. Weights are int8, activations are uint8, accumulators are int32, and rescaling between layers is done with an integer multiply and a shift. Getting the high 32 bits of a 64-bit product in a language whose only number is a double is <a href="./how-it-works.html#kernels">the interesting part</a>.</p>
 <p>The JavaScript is checked against a NumPy implementation of the same integer program and must produce <b>identical</b> logits on every validation image — not close, identical.</p>
+<p>The full write-up covers the training, the quantization scheme and the kernels, and reports what the model gets wrong: <a href="./how-it-works.html">how Not Hotdog works</a>.</p>
 
 <footer>
-  <span>Eric Spencer &middot; <a href="https://github.com/EricSpencer00/not-hotdog">source &amp; numbers</a></span>
+  <span>Eric Spencer &middot; <a href="./how-it-works.html">how it works</a> &middot; <a href="https://github.com/EricSpencer00/not-hotdog">source &amp; numbers</a></span>
   <span>Inspired by the SeeFood gag in <i>Silicon Valley</i>. Not affiliated with HBO.</span>
 </footer>
 

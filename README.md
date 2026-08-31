@@ -1,6 +1,8 @@
 # Not Hotdog
 
-**[ericspencer.us/hotdog](https://ericspencer.us/hotdog)**
+**[ericspencer.us/hotdog](https://ericspencer.us/hotdog)** &middot;
+**[how it works](https://ericspencer.us/hotdog/how-it-works.html)** — the
+write-up: training, int8 quantization, and the JavaScript kernels.
 
 A convolutional network that answers one question — *is this a hot dog?* — with
 136,417 int8 parameters and hand-written JavaScript kernels. No TensorFlow.js,
@@ -277,13 +279,15 @@ data/        ingest + manifests (no images committed)
 train/       teacher, distillation, QAT, export, eval
 reference/   the integer program in NumPy — the ground truth
 engine/      the integer program in JavaScript + its tests
-web/         index.html, app, worker
+web/         index.html, how-it-works.html, app, worker
 dist/        bundled output
 ```
 
 `build.py` concatenates the ES modules, strips the import/export syntax and
-embeds the worker as a string, so the deployed page is two files and makes no
-requests. The modules exist so `node:test` can import individual kernels.
+embeds the worker as a string, so the demo is two files and makes no requests.
+The modules exist so `node:test` can import individual kernels. The write-up is
+copied through as a third, script-free page, and its tables are written by
+`scripts/fill_numbers.py` from `train/results/*.json` rather than typed.
 
 ## Reproducing
 

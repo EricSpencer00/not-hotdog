@@ -1,0 +1,442 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>How Not Hotdog works — training, int8 quantization, JavaScript kernels</title>
+<meta name="description" content="A technical write-up of a 136,417-parameter int8 CNN that runs in the browser with hand-written JavaScript kernels: distillation from an EfficientNet-B0 teacher, quantization-aware training, the fixed-point multiply, and the bit-exact parity proof.">
+<meta name="author" content="Eric Spencer">
+<link rel="canonical" href="https://ericspencer.us/hotdog/how-it-works.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How Not Hotdog works">
+<meta property="og:description" content="Distillation, quantization-aware training, and four convolution kernels written by hand in integer JavaScript — then proved bit-exact against NumPy.">
+<meta property="og:url" content="https://ericspencer.us/hotdog/how-it-works.html">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap">
+<style>
+:root{
+  --paper:oklch(0.978 0.006 80);--ink:oklch(0.11 0.015 60);--accent:oklch(0.30 0.13 22);
+  --dim:oklch(0.52 0.01 70);--rule:oklch(0.87 0.005 80);--wash:oklch(0.94 0.005 80);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+  font-size:17px;line-height:1.72;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.wrap{max-width:680px;margin:0 auto;padding:56px 24px 24px}
+.mono,code{font-family:"IBM Plex Mono",ui-monospace,monospace}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+hr{border:0;border-top:1px solid var(--rule);margin:32px 0}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-0.025em;line-height:1.08;margin:0 0 10px}
+nav.top{font-size:14px;font-weight:500;color:var(--dim);margin:14px 0 0}
+nav.top a{color:inherit}
+nav.top a:hover{color:var(--ink);text-decoration:none}
+.lead{font-size:19px;line-height:1.6;letter-spacing:-0.01em;margin:12px 0 0}
+h2{font-size:23px;font-weight:700;letter-spacing:-0.02em;line-height:1.2;
+  margin:52px 0 4px;padding-top:20px;border-top:1px solid var(--rule)}
+h3{font-size:16px;font-weight:600;letter-spacing:-0.01em;margin:30px 0 -6px}
+p{margin:14px 0}
+code{font-size:0.88em;background:var(--wash);padding:1px 4px;border-radius:3px}
+pre{background:var(--wash);border:1px solid var(--rule);border-radius:6px;
+  padding:14px 16px;overflow-x:auto;margin:18px 0}
+pre code{font-size:13px;background:none;padding:0;line-height:1.6}
+table{border-collapse:collapse;width:100%;margin:20px 0;font-size:14px;
+  font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 10px 6px 0;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+th{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:var(--dim)}
+td.n,th.n{text-align:right;padding-right:0}
+td .mono,table code{font-size:13px}
+.note{font-size:14px;color:var(--dim);margin:14px 0}
+.toc{font-size:14px;color:var(--dim);margin:24px 0 0;line-height:2}
+.toc a{color:var(--dim)}
+.toc a:hover{color:var(--ink)}
+.cta{display:inline-block;margin:22px 0 0;font-size:14px;font-weight:600;
+  border:1px solid var(--rule);border-radius:5px;padding:9px 15px;color:var(--ink)}
+.cta:hover{border-color:var(--ink);text-decoration:none}
+footer{margin-top:52px;border-top:1px solid var(--rule);padding-top:14px;
+  font-size:13px;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media(prefers-reduced-motion:reduce){*{transition-duration:0.01ms!important;animation-duration:0.01ms!important}}
+</style></head><body><div class="wrap">
+
+<h1>How Not Hotdog works</h1>
+<nav class="top"><a href="./">demo</a> &nbsp;&middot;&nbsp; <a href="https://github.com/EricSpencer00/not-hotdog">source</a> &nbsp;&middot;&nbsp; <a href="/">ericspencer.us</a></nav>
+<p class="lead">A 136,417-parameter convolutional network runs in your browser with no
+library behind it. This is how it was trained, how it was reduced to 8-bit
+integers, and how the convolutions are written in JavaScript that never touches
+a float.</p>
+
+<p class="toc">
+<a href="#constraint">1. The constraint</a><br>
+<a href="#model">2. What ships</a><br>
+<a href="#training">3. Training</a><br>
+<a href="#int8">4. Eight bits</a><br>
+<a href="#kernels">5. The kernels</a><br>
+<a href="#proof">6. Proving it</a><br>
+<a href="#wrong">7. What it gets wrong</a>
+</p>
+
+<h2 id="constraint">1. The constraint</h2>
+
+<p>One rule set every decision: the page is an HTML file and one script, and
+after it loads it never talks to the network again. No TensorFlow.js, no ONNX
+Runtime, no WebAssembly, no npm. Your photograph is read from a canvas, resized,
+classified, and forgotten.</p>
+
+<p>Running a neural network in a browser is not hard. There are three good
+libraries for it. What is interesting is running one with nothing: every
+operation has to exist as code somebody wrote, in integers, and the result has to
+be proved rather than asserted. A convolution bug does not crash. It makes the
+model slightly worse in a way nobody would ever notice.</p>
+
+<h2 id="model">2. What ships</h2>
+
+<p>96&times;96&times;3 input, a MobileNet-style depthwise-separable stack, ReLU
+only.</p>
+
+<table>
+<thead><tr><th>Stage</th><th>Op</th><th>Output</th><th class="n">Params</th></tr></thead>
+<tbody>
+<tr><td>stem</td><td>conv 3&times;3 s2, 3&rarr;16</td><td>48&times;48&times;16</td><td class="n">432</td></tr>
+<tr><td>b1</td><td>dw 3&times;3 + pw 16&rarr;32</td><td>48&times;48&times;32</td><td class="n">656</td></tr>
+<tr><td>b2</td><td>dw 3&times;3 s2 + pw 32&rarr;64</td><td>24&times;24&times;64</td><td class="n">2,336</td></tr>
+<tr><td>b3</td><td>dw 3&times;3 + pw 64&rarr;64</td><td>24&times;24&times;64</td><td class="n">4,672</td></tr>
+<tr><td>b4</td><td>dw 3&times;3 s2 + pw 64&rarr;128</td><td>12&times;12&times;128</td><td class="n">8,768</td></tr>
+<tr><td>b5</td><td>dw 3&times;3 + pw 128&rarr;128</td><td>12&times;12&times;128</td><td class="n">17,536</td></tr>
+<tr><td>b6</td><td>dw 3&times;3 s2 + pw 128&rarr;256</td><td>6&times;6&times;256</td><td class="n">33,920</td></tr>
+<tr><td>b7</td><td>dw 3&times;3 + pw 256&rarr;256</td><td>6&times;6&times;256</td><td class="n">67,840</td></tr>
+<tr><td>head</td><td>global avg pool &rarr; fc</td><td>1</td><td class="n">257</td></tr>
+<tr><td></td><td></td><td><b>total</b></td><td class="n"><b>136,417</b></td></tr>
+</tbody>
+</table>
+
+<p>14.0M multiply-accumulates per forward pass, 133 KB of int8 weights, about
+26 ms per image in Node on an M1 Max.</p>
+
+<p>The architecture is chosen by what has to be written by hand later. Hard-swish,
+squeeze-excite, residual addition and concatenation are one line each in PyTorch
+and a new kernel each in JavaScript. So the network uses four operations and
+nothing else: a dense 3&times;3 convolution in the stem, then a depthwise
+3&times;3 and a pointwise 1&times;1 in every block, with a ReLU after each. The
+head is a global average pool and one fully connected output.</p>
+
+<h2 id="training">3. Training</h2>
+
+<h3>Positives are the binding constraint</h3>
+
+<p>The dataset holds roughly 1,800 hot dog photographs against 12,000
+photographs of other food and 8,000 photographs of unrelated objects. The
+non-food negatives are there so the model learns <i>is this a hot dog</i> rather
+than <i>is this a photo of food</i>; without them every negative is a plated
+dish.</p>
+
+<p>Shown that ratio directly, a 136K-parameter network learns to say no. A
+class-balanced sampler fixes the learning problem and creates a calibration one,
+which is dealt with at the end of this section.</p>
+
+<h3>A teacher that never ships</h3>
+
+<p>An ImageNet-pretrained EfficientNet-B0 is fine-tuned at 224px as the teacher.
+It has 5.3M parameters and reaches F1 0.837 at 97.6% accuracy on validation.
+Its only job is to produce soft targets, so it has a hard gate: below 96%
+validation accuracy the data pipeline is the thing to fix, not the recipe.</p>
+
+<h3>Distillation</h3>
+
+<p>The student trains for 30 epochs against the teacher's soft probability at
+temperature <code>T=4</code>. The distillation term is binary cross-entropy of
+the student logit against <code>sigmoid(z_teacher / T)</code>, scaled by
+<code>T&sup2;</code> so the gradient does not collapse as the temperature rises.
+It carries a weight of <code>&alpha;=0.7</code>; the remaining 0.3 is ordinary
+cross-entropy against the hard label.</p>
+
+<p>For a student 200&times; smaller this is most of the point. The hard label
+says "hot dog". The soft target says "0.83 hot dog", and that gap carries what
+the teacher knows about how hot-dog-like this particular photograph is.</p>
+
+<p>One augmented crop feeds both networks: the teacher sees it at 224 with
+ImageNet normalization, the student sees the same crop at 96 scaled to
+<code>[0,1]</code>. If the two saw different augmentations, the soft label would
+describe an image the student never sees.</p>
+
+<h3>Calibration, then QAT</h3>
+
+<p>Activation ranges are observed in a separate pass with the weights frozen. You
+cannot fake-quantize an activation before you know its range, and you cannot know
+its range without running data through the trained network. Doing it as its own
+pass keeps the ranges honest: if the weights were still moving, the running
+average would track a distribution that no longer exists by the time training
+ends.</p>
+
+<p>Then 8 more epochs of quantization-aware training at a tenth of the learning
+rate, with fake quantization in the graph and BatchNorm folded into the
+convolution.</p>
+
+<p>Folding <b>during</b> QAT rather than at export matters. The fold rescales
+each output channel by <code>&gamma;/&radic;(&sigma;&sup2;+&epsilon;)</code>,
+which changes every per-channel maximum and therefore every weight scale. Train
+against unfolded weights and ship folded ones, and the weights that were trained
+are not the weights that run. BatchNorm statistics are frozen during this phase
+for the same reason: the fold reads the running mean and variance, so those have
+to stop moving or the folded weights drift under the quantizer.</p>
+
+<h3>Moving the threshold instead of retraining</h3>
+
+<p>Balanced sampling leaves the model with an implied prior of 50/50. The world
+it is deployed into is about 11:1 the other way, so thresholding the logit at
+zero fires far too eagerly.</p>
+
+<p>The fix is calibration, not retraining. Every distinct int32 logit on the
+validation set is swept, and the one that maximises F1 is folded into the head
+bias at export. The shipped model's decision is then plainly
+<code>accumulator &gt; 0</code>, and the browser carries no knowledge of the
+imbalance at all. The threshold is chosen on validation and reported on test,
+which is the only ordering that keeps the test number honest.</p>
+
+<h2 id="int8">4. Eight bits</h2>
+
+<table>
+<thead><tr><th>Tensor</th><th>Scheme</th></tr></thead>
+<tbody>
+<tr><td>weights</td><td>int8, per-output-channel symmetric, zero-point 0</td></tr>
+<tr><td>activations</td><td>uint8, per-tensor symmetric, zero-point 0</td></tr>
+<tr><td>bias</td><td>int32 at scale <code>s_w[c] &middot; s_in</code></td></tr>
+<tr><td>accumulate</td><td>int32</td></tr>
+<tr><td>requantize</td><td><code>RoundingDivideByPOT(SRDHM(acc, m0[c]), shift[c])</code></td></tr>
+</tbody>
+</table>
+
+<h3>Zero-point 0 is the whole trick</h3>
+
+<p>Every activation in this network is the output of a ReLU, so it is never
+negative. Asymmetric quantization only buys range when values go negative, so
+activations are quantized as unsigned symmetric with zero-point 0. It costs
+nothing and it deletes two problems.</p>
+
+<p>The zero-point correction term disappears from every accumulator: a
+convolution becomes a plain sum of products. And SAME padding becomes genuinely
+zero, rather than "the quantized value that represents zero", so a kernel can
+skip an out-of-bounds tap and be exactly right instead of approximately right.</p>
+
+<h3>The input scale is exactly 1/255</h3>
+
+<p>The student is trained on <code>pixel/255</code>, so its input quantizer lands
+on scale 1/255 with zero-point 0. The quantized input tensor is then bit-identical
+to the raw RGB bytes off the canvas, and preprocessing is a byte copy. The export
+step asserts this rather than hoping for it.</p>
+
+<h3>Requantization</h3>
+
+<p>Each layer's real multiplier is <code>M = (s_w[c] &middot; s_in) / s_out</code>,
+one value per output channel. Export checks that <code>M &lt; 1</code> — the
+kernels only implement right shifts — and decomposes it into an int32
+<code>m0 &isin; [2&sup3;&#8304;, 2&sup3;&sup1;)</code> and a shift. These are
+gemmlowp's semantics exactly, which is deliberate: gemmlowp's rounding rules are
+precisely specified, so there is an existing definition to be correct against
+rather than a house convention.</p>
+
+<h2 id="kernels">5. The kernels</h2>
+
+<p>Four kernels, plus an integer pool and a dot product. That is the entire
+numerical part of the program.</p>
+
+<table>
+<thead><tr><th>Kernel</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td><code>conv3x3</code></td><td>dense 3&times;3, SAME pad — the stem only</td></tr>
+<tr><td><code>dwconv3x3</code></td><td>depthwise 3&times;3, SAME pad — 7 call sites</td></tr>
+<tr><td><code>pwconv1x1</code></td><td>pointwise, a GEMM over channels — about 80% of the MACs</td></tr>
+<tr><td><code>requantize</code></td><td>int32 &rarr; uint8, fused into the three above</td></tr>
+</tbody>
+</table>
+
+<p>The layout is NHWC everywhere. That makes the pointwise convolution a
+contiguous dot product along the channel axis — the inner loop walks the
+activation and the weight linearly — and it makes the activation taps behind the
+demo's "show internals" button a strided read instead of a transpose.</p>
+
+<h3>Accumulating in doubles, on purpose</h3>
+
+<p>Products are int8 &times; uint8, so no product exceeds
+<code>127 &times; 255 = 32,385</code>. The longest accumulation is
+<code>3 &times; 3 &times; 256 = 2,304</code> terms, so the accumulator stays under
+7.5&times;10&#8311;. That is far inside 2&#8309;&sup3;, where a double holds an
+integer exactly. The inner loops therefore use plain <code>*</code> and
+<code>+</code> and coerce to int32 once at the end. The arithmetic is exact and
+the loop stays fast.</p>
+
+<h3>The multiply that does not fit</h3>
+
+<p>Requantizing an int32 accumulator needs the high 32 bits of a signed 64-bit
+product. This is the one function the whole port rests on, and JavaScript cannot
+express it directly. A Number is a double with a 53-bit mantissa, so
+<code>a * b</code> for two int32 operands silently loses the low bits. BigInt is
+exact and far too slow to call once per output element.</p>
+
+<p>The way out is to never form the 64-bit product. Split each operand into a
+signed high half and an unsigned low half:</p>
+
+<pre><code>const aHi = a &gt;&gt; 16;        // signed,   |aHi| &lt;= 2^15
+const aLo = a &amp; 0xffff;     // unsigned, &lt; 2^16
+// a === aHi * 2^16 + aLo, exactly, for any two's complement int32</code></pre>
+
+<p>Then with <code>A = aHi*bHi</code>, <code>B = aHi*bLo + aLo*bHi</code> and
+<code>C = aLo*bLo</code>:</p>
+
+<pre><code>a*b = A*2^32 + B*2^16 + C</code></pre>
+
+<p><code>|A| &lt;= 2^30</code>, <code>|B| &lt; 2^32</code> and
+<code>C &lt; 2^32</code>, so each one is an exact double. The useful part is that
+<code>T = B*2^16 + C + nudge</code> stays below <code>2^49</code> and is therefore
+also exact. Since <code>a*b + nudge = (2A)*2^31 + T</code>, the quotient by
+<code>2^31</code> falls out of a floor-divide of <code>T</code> alone. No 64-bit
+value is ever materialised.</p>
+
+<p>It is verified against the Python reference over 1,000,000 random pairs plus
+every boundary combination — <code>INT32_MIN</code>, <code>INT32_MAX</code>,
+powers of two, the values where the high/low split carries. A million multiplies
+take about 50 ms, which is why this is a plain function call in the inner loop
+and not a BigInt.</p>
+
+<h3>The resize is hand-written too</h3>
+
+<p>The obvious way to get a 96&times;96 image is <code>drawImage</code>. Its
+resampling filter is not specified precisely and differs between Safari, Chrome
+and Firefox, so the same photograph would produce different bytes in different
+browsers and bit-exactness would hold in one of them only.</p>
+
+<p>So the preprocessing is a centre crop to the largest square, then an area
+average over integer pixel ranges with round-half-up. That has exactly one
+possible answer, and <code>reference/preprocess.py</code> is the same arithmetic
+on the same integers.</p>
+
+<h3>Buffers and the worker</h3>
+
+<p>Every buffer is allocated once and reused. Camera mode runs 15 to 30 times a
+second, and allocating about 400 KB of typed arrays per frame would hand the
+garbage collector a steady job and put a visible stutter in the verdict. Two
+scratch buffers alternate as input and output between layers, each sized to the
+largest activation in the network. The whole engine runs in a Web Worker: the
+main thread posts a frame and receives a logit, so the interface never
+blocks.</p>
+
+<h2 id="proof">6. Proving it</h2>
+
+<p>The same integer program exists twice: once in JavaScript, once in NumPy. They
+must produce identical int32 logits on every validation image. Not close.
+Identical.</p>
+
+<table>
+<thead><tr><th>Test</th><th>What it establishes</th></tr></thead>
+<tbody>
+<tr><td><code>fixedpoint</code></td><td>1,000,000 random pairs and every boundary combination, exact</td></tr>
+<tr><td><code>kernels</code></td><td>each kernel against NumPy: stride-2 on odd inputs, SAME-pad edges, int8 saturation</td></tr>
+<tr><td><code>parity</code></td><td>JS logit &equiv; Python logit on every validation image</td></tr>
+</tbody>
+</table>
+
+<p>Both engines read the same exported bytes. One export step writes
+<code>reference/model_int8.npz</code> and <code>dist/model.js</code> from one
+checkpoint. If each loaded weights independently, a parity failure would be
+ambiguous between "the kernels disagree" and "the loaders disagree", and only the
+first is interesting.</p>
+
+<p>Two more properties are tested because they are easy to break by accident. The
+activation taps are observational, so opening the internals panel cannot change
+the verdict. And repeated inference is stateless, so the reused buffers cannot
+leak the previous frame into the current one.</p>
+
+<p>All of it runs in CI on every push, with numpy and node and no dataset, since
+the 133 KB exported model is committed.</p>
+
+<h2 id="wrong">7. What it gets wrong</h2>
+
+<p>Everything below is measured on the int8 model — the one that ships — with the
+browser's exact preprocessing, not on the float checkpoint.</p>
+
+<!--RESULTS-->
+<h3>Accuracy</h3>
+
+<table>
+<thead><tr><th>split</th><th class="n">n</th><th class="n">positives</th><th class="n">accuracy</th><th class="n">majority</th><th class="n">F1</th><th class="n">precision</th><th class="n">recall</th></tr></thead>
+<tbody>
+<tr><td>validation</td><td class="n">3,369</td><td class="n">263</td><td class="n">95.3%</td><td class="n">92.2%</td><td class="n">0.672</td><td class="n">0.745</td><td class="n">0.612</td></tr>
+<tr><td>test</td><td class="n">3,415</td><td class="n">253</td><td class="n">94.8%</td><td class="n">92.6%</td><td class="n">0.634</td><td class="n">0.661</td><td class="n">0.609</td></tr>
+<tr><td>adversarial</td><td class="n">150</td><td class="n">14</td><td class="n">81.3%</td><td class="n">90.7%</td><td class="n">0.176</td><td class="n">0.150</td><td class="n">0.214</td></tr>
+</tbody>
+</table>
+
+<p><b>Read F1, not accuracy.</b> About 92.6% of the test split is negative, so a
+model that says "not a hot dog" to everything already scores 92.6%. The accuracy
+column is there because people expect it, not because it means much.</p>
+
+<h3>The adversarial set</h3>
+
+<p>Six classes are held out entirely. Not one image of any of them appears in
+training.</p>
+
+<table>
+<thead><tr><th>class</th><th class="n">n</th><th class="n">correct</th><th class="n">accuracy</th></tr></thead>
+<tbody>
+<tr><td><code>bratwurst</code></td><td class="n">40</td><td class="n">34/40</td><td class="n">85.0%</td></tr>
+<tr><td><code>chili_dog</code></td><td class="n">12</td><td class="n">3/12</td><td class="n">25.0%</td></tr>
+<tr><td><code>corn_dog</code></td><td class="n">10</td><td class="n">8/10</td><td class="n">80.0%</td></tr>
+<tr><td><code>dachshund</code></td><td class="n">40</td><td class="n">40/40</td><td class="n">100.0%</td></tr>
+<tr><td><code>hot_dog_bun</code></td><td class="n">40</td><td class="n">31/40</td><td class="n">77.5%</td></tr>
+<tr><td><code>hot_dog_wild</code></td><td class="n">2</td><td class="n">0/2</td><td class="n">0.0%</td></tr>
+<tr><td><code>sausage_roll</code></td><td class="n">6</td><td class="n">6/6</td><td class="n">100.0%</td></tr>
+</tbody>
+</table>
+
+<p>Adversarial accuracy, 81.3%, is below the majority baseline of 90.7%. That is
+not a rounding artefact. On this set the model is worse than a rock with "not a
+hot dog" written on it.</p>
+
+<p>The per-class split says why, and it is more interesting than the aggregate.
+The model rejects things that are nearly hot dogs: it gets 119/136 of the
+held-out negatives, never once mistakes a dachshund for food, and correctly
+refuses 8 of 10 corn dogs. What it fails is hard positives, 3/14, driven by chili
+dogs — hot dogs buried under chili, which look nothing like the canonical
+article.</p>
+
+<h3>The pipeline, end to end</h3>
+
+<table>
+<thead><tr><th>stage</th><th>metric</th></tr></thead>
+<tbody>
+<tr><td>teacher (EfficientNet-B0, 5.3M params)</td><td>F1 0.837, accuracy 97.6%</td></tr>
+<tr><td>student after distillation (float)</td><td>F1 0.584</td></tr>
+<tr><td>student after QAT (int8)</td><td>F1 0.586</td></tr>
+<tr><td>cost of quantization</td><td>-0.003 F1</td></tr>
+<tr><td>decision threshold (int32, folded into bias)</td><td>55,983</td></tr>
+</tbody>
+</table>
+<!--/RESULTS-->
+
+<p>So the model has learned a narrow, prototypical hot dog, and it is
+conservative about anything outside that. Given 1,800 positives and 136K
+parameters, that is the result you would predict. It is worth stating plainly
+rather than reporting the flattering test number and moving on.</p>
+
+<p>The teacher-to-student gap is the honest headline of the training pipeline: a
+136K-parameter network does not match a 5.3M-parameter one, and distillation
+narrows the gap rather than closing it. What quantization costs on top of that is
+too small to measure, which is the part QAT was for.</p>
+
+<hr>
+
+<p>The demo, the model, the reference implementation and every number above are
+in the repository. The manifests record the source, licence and split of every
+training image, and <code>make data</code> rebuilds the set.</p>
+
+<a class="cta" href="./">Try the demo</a>
+&nbsp;
+<a class="cta" href="https://github.com/EricSpencer00/not-hotdog">Read the source</a>
+
+<footer>
+  <span>Eric Spencer &middot; <a href="https://github.com/EricSpencer00/not-hotdog">source &amp; numbers</a></span>
+  <span>Inspired by the SeeFood gag in <i>Silicon Valley</i>. Not affiliated with HBO.</span>
+</footer>
+
+</div>
+</body></html>

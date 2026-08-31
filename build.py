@@ -6,10 +6,11 @@ concatenating the modules in dependency order, stripping the import/export
 syntax, and embedding the worker as a string that the app turns into a Blob URL
 at runtime.
 
-Output is two files:
+Output is three files:
 
     dist/index.html
-    dist/hotdog.js     engine + int8 weights + worker source + app
+    dist/hotdog.js         engine + int8 weights + worker source + app
+    dist/how-it-works.html the technical write-up, plain HTML, no script
 
 Nothing else is fetched, ever, except the sample thumbnails — and only if
 somebody clicks one.
@@ -75,6 +76,7 @@ def main() -> None:
     (DIST / "hotdog.js").write_text(out)
 
     shutil.copy(WEB / "index.html", DIST / "index.html")
+    shutil.copy(WEB / "how-it-works.html", DIST / "how-it-works.html")
     samples_src = WEB / "samples"
     samples_dst = DIST / "samples"
     if samples_src.exists():
@@ -84,11 +86,13 @@ def main() -> None:
 
     html = (DIST / "index.html").stat().st_size
     js = (DIST / "hotdog.js").stat().st_size
+    writeup = (DIST / "how-it-works.html").stat().st_size
     samples = sum(f.stat().st_size for f in samples_dst.glob("*")) if samples_dst.exists() else 0
 
     print(f"dist/index.html   {html / 1024:7.1f} KB")
     print(f"dist/hotdog.js    {js / 1024:7.1f} KB")
     print(f"critical path     {(html + js) / 1024:7.1f} KB   (no other requests)")
+    print(f"how-it-works.html {writeup / 1024:7.1f} KB   (separate page)")
     print(f"samples (lazy)    {samples / 1024:7.1f} KB   (fetched only on click)")
     if html + js > 250 * 1024:
         print("!! over the 250 KB budget in SPEC.md §1 C5")
