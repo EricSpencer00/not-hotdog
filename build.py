@@ -95,7 +95,10 @@ def main() -> None:
     print(f"how-it-works.html {writeup / 1024:7.1f} KB   (separate page)")
     print(f"samples (lazy)    {samples / 1024:7.1f} KB   (fetched only on click)")
     if html + js > 250 * 1024:
-        print("!! over the 250 KB budget in SPEC.md §1 C5")
+        raise SystemExit(
+            f"critical path {(html + js) / 1024:.1f} KB is over the 250 KB "
+            "budget in SPEC.md §1 C5"
+        )
 
 
 def _js_string(s: str) -> str:
