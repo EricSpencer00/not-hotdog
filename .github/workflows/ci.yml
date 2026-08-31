@@ -45,3 +45,11 @@ jobs:
         run: |
           python build.py
           test -f dist/hotdog.js
+
+      - name: Check the published numbers are in sync
+        # Every figure in the README and the write-up is injected from
+        # train/results/ by the filler. If re-running it changes anything, the
+        # committed text is stale or was edited by hand.
+        run: |
+          python scripts/fill_numbers.py
+          git diff --exit-code README.md web/how-it-works.html
